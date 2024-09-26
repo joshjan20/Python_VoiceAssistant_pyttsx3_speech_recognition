@@ -177,4 +177,5 @@ This voice assistant can:
 - Understand and parse dates from user input.
 - Take voice notes and save them in a text file.
 
+
 The overall design combines speech recognition, Google Calendar API interactions, and basic file handling to create a simple yet effective voice assistant. Let me know if you need any further explanations or clarifications!

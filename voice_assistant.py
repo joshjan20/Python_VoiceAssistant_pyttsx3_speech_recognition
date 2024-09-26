@@ -1,9 +1,9 @@
-### Code Overview
+"""
+Title: voice-assistant
+Description: 
+Author: John
+"""
 
-Let's break down the provided code for a voice assistant that interacts with the Google Calendar API, recognizes speech, and can take voice notes. 
-
-### Importing Required Libraries
-```python
 from __future__ import print_function
 import datetime
 import pickle
@@ -18,34 +18,33 @@ import speech_recognition as sr
 import pytz
 import subprocess
 import sounddevice
-```
-- **Standard Libraries**: `datetime`, `pickle`, and `os` are used for handling dates, serializing objects, and interacting with the operating system.
-- **Google API Libraries**: These are for authentication and interacting with the Google Calendar API.
-- **Speech Libraries**: `pyttsx3` for text-to-speech, `speech_recognition` for converting speech to text, and `sounddevice` for handling audio input/output.
 
-### Constants and Global Variables
-```python
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
-MONTHS = ["january", "february", ..., "december"]
-DAYS = ["monday", "tuesday", ..., "sunday"]
+MONTHS = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+]
+DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 DAY_EXTENTIONS = ["rd", "th", "st", "nd"]
-```
-- **SCOPES**: Defines the permissions needed for accessing the Google Calendar.
-- **MONTHS, DAYS, DAY_EXTENTIONS**: Lists to help parse user input when recognizing dates.
 
-### Functions
 
-#### 1. `speak(text)`
-```python
 def speak(text):
     engine = pyttsx3.init()
     engine.say(text)
     engine.runAndWait()
-```
-- Initializes a text-to-speech engine and speaks the given text.
 
-#### 2. `get_audio()`
-```python
+
 def get_audio():
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -59,12 +58,12 @@ def get_audio():
             print("Exception: " + str(e))
 
     return said.lower()
-```
-- Listens for audio input from the microphone, processes it, and returns the recognized speech in lowercase.
 
-#### 3. `authenticate_google()`
-```python
+
 def authenticate_google():
+    """Shows basic usage of the Google Calendar API.
+    Prints the start and name of the next 10 events on the user's calendar.
+    """
     creds = None
     if os.path.exists("token.pickle"):
         with open("token.pickle", "rb") as token:
@@ -81,14 +80,12 @@ def authenticate_google():
             pickle.dump(creds, token)
 
     service = build("calendar", "v3", credentials=creds)
-    return service
-```
-- Authenticates the user with the Google Calendar API.
-- Uses OAuth2 to manage credentials and token persistence in `token.pickle`.
 
-#### 4. `get_events(day, service)`
-```python
+    return service
+
+
 def get_events(day, service):
+    # Call the Calendar API
     date = datetime.datetime.combine(day, datetime.datetime.min.time())
     end_date = datetime.datetime.combine(day, datetime.datetime.max.time())
     utc = pytz.UTC
@@ -107,20 +104,82 @@ def get_events(day, service):
         .execute()
     )
     events = events_result.get("items", [])
-    ...
-```
-- Fetches and lists events from the user's Google Calendar for a specific day.
-- Converts local time to UTC for API compatibility.
 
-#### 5. `get_date(text)`
-```python
+    if not events:
+        speak("No upcoming events found.")
+    else:
+        speak(f"You have {len(events)} events on this day.")
+
+        for event in events:
+            start = event["start"].get("dateTime", event["start"].get("date"))
+            print(start, event["summary"])
+            start_time = str(start.split("T")[1].split("-")[0])
+            if int(start_time.split(":")[0]) < 12:
+                start_time = start_time + "am"
+            else:
+                start_time = (
+                    str(int(start_time.split(":")[0]) - 12) + start_time.split(":")[1]
+                )
+                start_time = start_time + "pm"
+
+            speak(event["summary"] + " at " + start_time)
+
+
 def get_date(text):
-    ...
-```
-- Parses a given text to extract the date the user is referring to (today, specific days of the week, etc.).
+    text = text.lower()
+    today = datetime.date.today()
 
-#### 6. `note(text)`
-```python
+    if text.count("today") > 0:
+        return today
+
+    day = -1
+    day_of_week = -1
+    month = -1
+    year = today.year
+
+    for word in text.split():
+        if word in MONTHS:
+            month = MONTHS.index(word) + 1
+        elif word in DAYS:
+            day_of_week = DAYS.index(word)
+        elif word.isdigit():
+            day = int(word)
+        else:
+            for ext in DAY_EXTENTIONS:
+                found = word.find(ext)
+                if found > 0:
+                    try:
+                        day = int(word[:found])
+                    except:
+                        pass
+
+    if (
+        month < today.month and month != -1
+    ):  # if the month mentioned is before the current month set the year to the next
+        year = year + 1
+
+    if month == -1 and day != -1:  # if we didn't find a month, but we have a day
+        if day < today.day:
+            month = today.month + 1
+        else:
+            month = today.month
+
+    # if we only found a day of the week
+    if month == -1 and day == -1 and day_of_week != -1:
+        current_day_of_week = today.weekday()
+        dif = day_of_week - current_day_of_week
+
+        if dif < 0:
+            dif += 7
+            if text.count("next") >= 1:
+                dif += 7
+
+        return today + datetime.timedelta(dif)
+
+    if day != -1:  # FIXED FROM VIDEO
+        return datetime.date(month=month, day=day, year=year)
+
+
 def note(text):
     date = datetime.datetime.now()
     file_name = str(date).replace(":", "-") + "-note.txt"
@@ -128,11 +187,8 @@ def note(text):
         f.write(text)
 
     subprocess.Popen(["notepad.exe", file_name])
-```
-- Creates a text file with the user's notes. Opens it in Notepad (Windows).
 
-### Main Loop
-```python
+
 WAKE = "hey tim"
 SERVICE = authenticate_google()
 print("Start")
@@ -161,21 +217,3 @@ while True:
                 note_text = get_audio()
                 note(note_text)
                 speak("I've made a note of that.")
-```
-- This is the main loop of the program:
-  - Listens for a specific wake phrase ("hey tim").
-  - Once activated, it listens for further commands.
-  - It checks if the command relates to checking calendar events or making notes.
-  - Based on the command, it calls the appropriate function to fetch events or create a note.
-
-### Summary
-
-This voice assistant can:
-- Speak back to the user.
-- Listen to voice commands.
-- Authenticate with Google Calendar and retrieve events.
-- Understand and parse dates from user input.
-- Take voice notes and save them in a text file.
-
-
-The overall design combines speech recognition, Google Calendar API interactions, and basic file handling to create a simple yet effective voice assistant. Let me know if you need any further explanations or clarifications!
